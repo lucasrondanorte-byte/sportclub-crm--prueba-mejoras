@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF--8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SportClub CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!--
+      PRODUCTION NOTE:
+      For optimal performance, Tailwind CSS should be installed via npm and processed
+      as part of the build step (e.g., with Vite and PostCSS). This allows for
+      purging unused styles and minimizing the final CSS bundle size.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!--
+      PRODUCTION NOTE:
+      In a production environment, this configuration should be moved to a
+      `tailwind.config.js` file and processed by your build tool.
+    -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Montserrat', 'sans-serif'],
+            },
+            colors: {
+              'brand-primary': '#E30513',
+              'brand-primary-hover': '#B91C1C',
+              'brand-accent': '#FFD400',
+              'brand-accent-hover': '#E6BB00',
+              'brand-bg': '#111827', // gray-900
+              'brand-sidebar': '#1F2937', // gray-800
+              'brand-surface': '#1F2937', // gray-800
+              'brand-border': '#374151', // gray-700
+              'brand-text-primary': '#F9FAFB', // gray-50
+              'brand-text-secondary': '#D1D5DB', // gray-300
+              'brand-text-muted': '#9CA3AF', // gray-400
+            },
+          }
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!--
+    PRODUCTION NOTE:
+    This importmap is used for this demo to load dependencies from a CDN without a build step.
+    In a standard Vite production build, dependencies would be bundled from node_modules,
+    and this importmap would not be necessary.
+  -->
+
+<link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.2.1"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/sportclub-crm--prueba-mejoras/assets/index-Dh2HMBa2.js"></script>
+</head>
+  <body class="bg-brand-bg font-sans text-brand-text-primary">
+    <div id="root"></div>
+  </body>
+</html>
