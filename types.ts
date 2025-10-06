@@ -4,6 +4,7 @@ export enum Branch {
   Diagonal = 'Diagonal',
   MujerCentro = 'Mujer Centro',
   Tribunales = 'Tribunales',
+  General = 'General',
 }
 
 export enum Role {

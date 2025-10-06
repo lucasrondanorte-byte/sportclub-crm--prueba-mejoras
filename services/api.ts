@@ -12,26 +12,26 @@ import {
   ProspectStage,
 } from '../types';
 import {
-  mockUsers,
   mockProspects,
   mockMembers,
   mockTasks,
   mockInteractions
 } from '../data/mockData';
-import { encrypt, decrypt, hashPassword, comparePassword } from './encryptionService';
+import { encrypt, decrypt } from './encryptionService';
 
 // ---
 //
-// **MOCK API SERVICE with LocalStorage Persistence**
+// **HYBRID API SERVICE**
 //
-// This service simulates a backend API by using mock data.
-// To make the demo more interactive, it uses localStorage to persist
-// any changes (adds, updates) you make. Refreshing the page will
-// not reset the data to its initial state.
+// This service uses a real backend (Google Apps Script) for user management
+// and uses mock data with localStorage for other entities (Prospects, Members, etc.).
+// This allows for partial backend integration without breaking the entire app.
 //
-// To reset the data, clear your browser's localStorage for this site.
+// To reset mock data, clear your browser's localStorage for this site.
 //
 // ---
+
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVT7XxhIAzCcs474QTQP1W1KTIi1c1Mo9LDVzllTY505DKWBYYT4oAQ3HY3Bc9d_zUxA/exec";
 
 const MOCK_DELAY = 500; // 500ms delay to simulate network latency
 
@@ -71,8 +71,7 @@ const initializeStorage = <T>(key: string, mockData: T[]): T[] => {
     return data;
 }
 
-// Initialize data
-let users: any[] = initializeStorage('sportclub-crm-users', mockUsers);
+// Initialize MOCK data for non-user entities
 let prospects: Prospect[] = initializeStorage('sportclub-crm-prospects', mockProspects);
 let members: Member[] = initializeStorage('sportclub-crm-members', mockMembers);
 let tasks: Task[] = initializeStorage('sportclub-crm-tasks', mockTasks);
@@ -107,7 +106,7 @@ const encryptMember = (m: Member): Member => ({
 });
 
 /* =========================
-   GOOGLE SHEET HELPERS
+   GOOGLE SHEET HELPERS (for Prospect Import)
    ========================= */
 const GOOGLE_SHEET_ID = '1HSHlF6SroNGqwV3NDLmZJwNVtiwl_rVIesjPAzJE_Jg';
 const GOOGLE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
@@ -186,122 +185,162 @@ function rowsToObjectsCanonical(rows: string[][]): Record<string,string>[] {
 /* ========================= */
 
 export const api = {
-  login: (email: string, password: string): Promise<User | null> => mockApiCall(resolve => {
-      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (foundUser && foundUser.password) {
-        if (comparePassword(password, foundUser.password)) {
-          const { password, ...userToReturn } = foundUser;
-          resolve(userToReturn);
-        } else {
-          resolve(null);
+    // ===================================
+    // REAL API METHODS (Google Apps Script)
+    // ===================================
+
+    getUsers: async (): Promise<User[]> => {
+        try {
+            // Using GET for read operations is standard practice
+            const response = await fetch(`${SCRIPT_URL}?action=getUsers`);
+            const data = await response.json();
+
+            if (!data.success) {
+                console.error("Error fetching users from Apps Script:", data.message);
+                return [];
+            }
+            
+            const isValidBranch = (branch: any): branch is Branch => Object.values(Branch).includes(branch);
+            const isValidRole = (role: any): role is Role => Object.values(Role).includes(role);
+
+            return data.users.map((u: any): User => ({
+                id: u.id || u.email, // Backend should provide a stable ID, fallback to email.
+                name: u.name || "Sin Nombre",
+                email: u.email || "",
+                role: isValidRole(u.role) ? u.role : Role.Viewer,
+                branch: isValidBranch(u.branch) ? u.branch : Branch.General,
+            }));
+        } catch (error) {
+            console.error("Network error fetching users:", error);
+            return [];
         }
-      } else {
-        resolve(null);
-      }
-  }),
+    },
+    
+    updateUser: async (user: User): Promise<User> => {
+        try {
+            const formData = new FormData();
+            formData.append('action', 'updateUser');
+            formData.append('email', user.email);
+            formData.append('name', user.name);
+            formData.append('role', user.role);
+            formData.append('branch', user.branch);
+
+            const response = await fetch(SCRIPT_URL, {
+                method: "POST",
+                body: formData,
+            });
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Error al actualizar usuario en el backend.');
+            }
+            // Assume backend returns the fully updated user object for consistency
+            return data.user || user; 
+        } catch (error) {
+            console.error("Error updating user:", error);
+            throw error; // Re-throw to be handled by the calling component
+        }
+    },
+
+    // Note: This method is not actively used by the UI, which uses AuthProvider's signup.
+    // It is kept for potential future use (e.g., an admin panel to create users).
+    addUser: async (userData: Omit<User, 'id'> & { password?: string }): Promise<User> => {
+        try {
+            const formData = new FormData();
+            formData.append('action', 'saveUser');
+            formData.append('name', userData.name);
+            formData.append('email', userData.email);
+            formData.append('pin', userData.password || '');
+            formData.append('branch', userData.branch);
+            
+            const response = await fetch(SCRIPT_URL, {
+                method: "POST",
+                body: formData,
+            });
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Error al crear usuario en el backend.');
+            }
+            return data.user;
+        } catch (error) {
+            console.error("Error creating user:", error);
+            throw error;
+        }
+    },
   
-  getUsers: (): Promise<User[]> => mockApiCall(resolve => {
-    resolve(users.map(({ password, ...user }) => user));
-  }),
+    // ===================================
+    // MOCK API METHODS (LocalStorage)
+    // ===================================
   
-  getProspects: (): Promise<Prospect[]> => mockApiCall(resolve => resolve(prospects.map(decryptProspect))),
+    getProspects: (): Promise<Prospect[]> => mockApiCall(resolve => resolve(prospects.map(decryptProspect))),
   
-  getMembers: (): Promise<Member[]> => mockApiCall(resolve => resolve(members.map(decryptMember))),
+    getMembers: (): Promise<Member[]> => mockApiCall(resolve => resolve(members.map(decryptMember))),
 
-  getTasks: (): Promise<Task[]> => mockApiCall(resolve => resolve([...tasks])),
+    getTasks: (): Promise<Task[]> => mockApiCall(resolve => resolve([...tasks])),
 
-  getInteractions: (): Promise<Interaction[]> => mockApiCall(resolve => resolve([...interactions])),
+    getInteractions: (): Promise<Interaction[]> => mockApiCall(resolve => resolve([...interactions])),
   
-  getInteractionsByRelatedId: (relatedId: string): Promise<Interaction[]> => mockApiCall(resolve => {
-      const relatedInteractions = interactions.filter(i => i.relatedTo === relatedId);
-      resolve(relatedInteractions);
-  }),
+    getInteractionsByRelatedId: (relatedId: string): Promise<Interaction[]> => mockApiCall(resolve => {
+        const relatedInteractions = interactions.filter(i => i.relatedTo === relatedId);
+        resolve(relatedInteractions);
+    }),
 
-  addProspect: (prospectData: Omit<Prospect, 'id' | 'createdAt' | 'updatedAt' | 'branch'>): Promise<Prospect> => mockApiCall(resolve => {
-    const seller = users.find(u => u.id === prospectData.assignedTo);
-    const newProspect: Prospect = {
-      ...prospectData,
-      id: `prospect_${Date.now()}`,
-      branch: seller?.branch || Branch.Paraguay,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    prospects.push(encryptProspect(newProspect));
-    saveToStorage('sportclub-crm-prospects', prospects);
-    resolve(newProspect);
-  }),
-
-  updateProspect: (prospectData: Prospect): Promise<Prospect> => mockApiCall((resolve, reject) => {
-    const index = prospects.findIndex(p => p.id === prospectData.id);
-    if (index !== -1) {
-      const updatedProspect = {
-          ...prospectData,
-          updatedAt: new Date().toISOString()
-      };
-      prospects[index] = encryptProspect(updatedProspect);
-      saveToStorage('sportclub-crm-prospects', prospects);
-      resolve(updatedProspect);
-    } else {
-      reject(new Error("Prospect not found"));
-    }
-  }),
-
-  addMember: (memberData: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'branch' | 'lastActionDate'>): Promise<Member> => mockApiCall(resolve => {
-    const seller = users.find(u => u.id === memberData.originalSeller);
-    const newMember: Member = {
-      ...memberData,
-      id: `member_${Date.now()}`,
-      branch: seller?.branch || Branch.Paraguay,
-      lastActionDate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    members.push(encryptMember(newMember));
-    saveToStorage('sportclub-crm-members', members);
-    resolve(newMember);
-  }),
-
-  addInteraction: (interactionData: Omit<Interaction, 'id' | 'date'>): Promise<Interaction> => mockApiCall(resolve => {
-    const newInteraction: Interaction = {
-      ...interactionData,
-      id: `int_${Date.now()}`,
-      date: new Date().toISOString(),
-    };
-    interactions.push(newInteraction);
-    saveToStorage('sportclub-crm-interactions', interactions);
-
-    const memberIndex = members.findIndex(m => m.id === newInteraction.relatedTo);
-    if (memberIndex !== -1) {
-        const member = members[memberIndex];
-        members[memberIndex] = {
-            ...member,
-            lastActionDate: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+    addProspect: (prospectData: Omit<Prospect, 'id' | 'createdAt' | 'updatedAt' | 'branch'> & {assignedTo: string}): Promise<Prospect> => mockApiCall(async resolve => {
+        // Fetch users from the real API to get the correct branch for the assigned seller
+        const allUsers = await api.getUsers();
+        const seller = allUsers.find(u => u.id === prospectData.assignedTo);
+        const newProspect: Prospect = {
+        ...prospectData,
+        id: `prospect_${Date.now()}`,
+        branch: seller?.branch || Branch.General,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         };
+        prospects.push(encryptProspect(newProspect));
+        saveToStorage('sportclub-crm-prospects', prospects);
+        resolve(newProspect);
+    }),
+
+    updateProspect: (prospectData: Prospect): Promise<Prospect> => mockApiCall((resolve, reject) => {
+        const index = prospects.findIndex(p => p.id === prospectData.id);
+        if (index !== -1) {
+        const updatedProspect = {
+            ...prospectData,
+            updatedAt: new Date().toISOString()
+        };
+        prospects[index] = encryptProspect(updatedProspect);
+        saveToStorage('sportclub-crm-prospects', prospects);
+        resolve(updatedProspect);
+        } else {
+        reject(new Error("Prospect not found"));
+        }
+    }),
+
+    addMember: (memberData: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'branch' | 'lastActionDate'> & {originalSeller: string}): Promise<Member> => mockApiCall(async resolve => {
+        const allUsers = await api.getUsers();
+        const seller = allUsers.find(u => u.id === memberData.originalSeller);
+        const newMember: Member = {
+        ...memberData,
+        id: `member_${Date.now()}`,
+        branch: seller?.branch || Branch.General,
+        lastActionDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        };
+        members.push(encryptMember(newMember));
         saveToStorage('sportclub-crm-members', members);
-    }
+        resolve(newMember);
+    }),
 
-    resolve(newInteraction);
-  }),
+    addInteraction: (interactionData: Omit<Interaction, 'id' | 'date'>): Promise<Interaction> => mockApiCall(resolve => {
+        const newInteraction: Interaction = {
+        ...interactionData,
+        id: `int_${Date.now()}`,
+        date: new Date().toISOString(),
+        };
+        interactions.push(newInteraction);
+        saveToStorage('sportclub-crm-interactions', interactions);
 
-  addTask: (taskData: Omit<Task, 'id'>): Promise<Task> => mockApiCall(resolve => {
-    const newTask: Task = {
-      ...taskData,
-      id: `task_${Date.now()}`,
-    };
-    tasks.push(newTask);
-    saveToStorage('sportclub-crm-tasks', tasks);
-    resolve(newTask);
-  }),
-
-  updateTask: (taskData: Task): Promise<Task> => mockApiCall((resolve, reject) => {
-    const index = tasks.findIndex(t => t.id === taskData.id);
-    if (index !== -1) {
-      tasks[index] = taskData;
-      saveToStorage('sportclub-crm-tasks', tasks);
-      
-      if (taskData.status === TaskStatus.Done) {
-        const memberIndex = members.findIndex(m => m.id === taskData.relatedTo);
+        const memberIndex = members.findIndex(m => m.id === newInteraction.relatedTo);
         if (memberIndex !== -1) {
             const member = members[memberIndex];
             members[memberIndex] = {
@@ -311,134 +350,125 @@ export const api = {
             };
             saveToStorage('sportclub-crm-members', members);
         }
-      }
 
-      resolve(taskData);
-    } else {
-      reject(new Error("Task not found"));
-    }
-  }),
+        resolve(newInteraction);
+    }),
 
-  addUser: (userData: Omit<User, 'id' | 'role'> & { password?: string }): Promise<User> => mockApiCall((resolve, reject) => {
-    const existingUser = users.find(u => u.email.toLowerCase() === userData.email.toLowerCase());
-    if (existingUser) {
-      reject(new Error("Ya existe un usuario con este email."));
-      return;
-    }
+    addTask: (taskData: Omit<Task, 'id'>): Promise<Task> => mockApiCall(resolve => {
+        const newTask: Task = {
+        ...taskData,
+        id: `task_${Date.now()}`,
+        };
+        tasks.push(newTask);
+        saveToStorage('sportclub-crm-tasks', tasks);
+        resolve(newTask);
+    }),
 
-    const newUser = {
-      name: userData.name,
-      email: userData.email,
-      branch: userData.branch,
-      id: `user_${Date.now()}`,
-      role: Role.Viewer,
-      password: userData.password ? hashPassword(userData.password) : undefined,
-    };
-    users.push(newUser);
-    saveToStorage('sportclub-crm-users', users);
-    
-    const { password, ...userToReturn } = newUser;
-    resolve(userToReturn);
-  }),
-
-  updateUser: (userData: User): Promise<User> => mockApiCall((resolve, reject) => {
-    const index = users.findIndex(u => u.id === userData.id);
-    if (index !== -1) {
-      users[index] = { ...users[index], ...userData };
-      saveToStorage('sportclub-crm-users', users);
-      const { password, ...userToReturn } = users[index];
-      resolve(userToReturn);
-    } else {
-      reject(new Error("User not found"));
-    }
-  }),
-
-  deleteUser: (userId: string): Promise<void> => mockApiCall((resolve, reject) => {
-    const initialLength = users.length;
-    users = users.filter(u => u.id !== userId);
-    if (users.length < initialLength) {
-      saveToStorage('sportclub-crm-users', users);
-      resolve();
-    } else {
-      reject(new Error("User not found"));
-    }
-  }),
-
-  runGoogleSheetImport: async (currentUser: User, allSellers: User[]): Promise<{ success: boolean; message: string; importedCount: number; }> => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            if (!currentUser || allSellers.length === 0) {
-                throw new Error("No hay vendedores disponibles para asignar los prospectos.");
-            }
-
-            const response = await fetch(GOOGLE_SHEET_URL);
-            const rawText = await response.text();
-            if (!response.ok) throw new Error(`Google Sheets respondió ${response.status}.`);
-            if (/^\s*<!doctype html>|<html[\s>]/i.test(rawText)) {
-                throw new Error('La hoja devolvió HTML (no CSV). Compartí como "Cualquier persona con el enlace: Lector" o "Publicar en la web".');
-            }
-            
-            const rows = parseCsvToRows(rawText);
-            const parsedData = rowsToObjectsCanonical(rows);
-
-            if (parsedData.length === 0) {
-                resolve({ success: true, importedCount: 0, message: "No se encontraron datos nuevos para importar." });
-                return;
-            }
-
-            const allProspects = await api.getProspects();
-            const existingPhones = new Set((allProspects || []).map(p => normalizePhone(p.phone || '')).filter(Boolean));
-            const existingEmails = new Set((allProspects || []).map(p => (p.email || '').toLowerCase().trim()).filter(Boolean));
-
-            let total = 0, missing = 0, dup = 0;
-            const newRows: Array<{ name: string; phoneNorm: string; emailNorm: string; row: Record<string,string> }> = [];
-
-            for (const row of parsedData) {
-                total++;
-                const name = (row['name'] || '').trim();
-                const phoneNorm = normalizePhone(row['phone'] || row['whatsapp'] || '');
-                const emailNorm = (row['email'] || '').toLowerCase().trim();
-
-                if (!name || (!phoneNorm && !emailNorm)) { missing++; continue; }
-                const isDup = (phoneNorm && existingPhones.has(phoneNorm)) || (emailNorm && existingEmails.has(emailNorm));
-                if (isDup) { dup++; continue; }
-
-                newRows.push({ name, phoneNorm, emailNorm, row });
-            }
-
-            if (newRows.length === 0) {
-                const message = total > 0 && missing === total
-                    ? 'No se creó ninguno: faltan Nombre y/o Teléfono/Email en todas las filas.'
-                    : 'Todos los prospectos del archivo ya existen en el CRM.';
-                resolve({ success: true, importedCount: 0, message });
-                return;
-            }
-
-            const nextActionDate = new Date(); nextActionDate.setDate(nextActionDate.getDate() + 1);
-            const prospectsToAdd = newRows.map((item, index) => {
-                const assignedTo = allSellers[index % allSellers.length].id;
-                const phone = item.phoneNorm;
-                const email = item.emailNorm || placeholderEmailFromPhone(phone);
-                const r = item.row;
-                return {
-                    name: item.name, phone, email,
-                    source: ProspectSource.GoogleSheet, interest: ProspectInterest.NotReported, stage: ProspectStage.New,
-                    assignedTo, dni: r['dni'] || '', address: r['sucursal'] || '',
-                    notes: `Importado desde Google Sheet. Origen: ${r['origen'] || 'N/A'} | Sucursal: ${r['sucursal'] || 'N/A'} | Fecha: ${r['fecha'] || 'N/A'}`,
-                    createdBy: currentUser.id, updatedBy: currentUser.id,
-                    nextActionDate: nextActionDate.toISOString(),
+    updateTask: (taskData: Task): Promise<Task> => mockApiCall((resolve, reject) => {
+        const index = tasks.findIndex(t => t.id === taskData.id);
+        if (index !== -1) {
+        tasks[index] = taskData;
+        saveToStorage('sportclub-crm-tasks', tasks);
+        
+        if (taskData.status === TaskStatus.Done) {
+            const memberIndex = members.findIndex(m => m.id === taskData.relatedTo);
+            if (memberIndex !== -1) {
+                const member = members[memberIndex];
+                members[memberIndex] = {
+                    ...member,
+                    lastActionDate: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
                 };
-            });
-
-            await Promise.all(prospectsToAdd.map(p => api.addProspect(p)));
-            
-            const resultMessage = `Filas: ${total} | Creados: ${prospectsToAdd.length} | Duplicados: ${dup} | Sin contacto: ${missing}`;
-            resolve({ success: true, importedCount: prospectsToAdd.length, message: resultMessage });
-
-        } catch (error: any) {
-            console.error("Failed to import from Google Sheet", error);
-            resolve({ success: false, message: error.message || "Ocurrió un error desconocido.", importedCount: 0 });
+                saveToStorage('sportclub-crm-members', members);
+            }
         }
-    });
-  },
+
+        resolve(taskData);
+        } else {
+        reject(new Error("Task not found"));
+        }
+    }),
+
+    deleteUser: (userId: string): Promise<void> => mockApiCall((resolve, reject) => {
+        console.warn(`Mock API: deleteUser for ${userId} was called, but this is not implemented against the real backend.`);
+        reject(new Error("User deletion is not implemented."));
+    }),
+
+    runGoogleSheetImport: async (currentUser: User, allSellers: User[]): Promise<{ success: boolean; message: string; importedCount: number; }> => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (!currentUser || allSellers.length === 0) {
+                    throw new Error("No hay vendedores disponibles para asignar los prospectos.");
+                }
+
+                const response = await fetch(GOOGLE_SHEET_URL);
+                const rawText = await response.text();
+                if (!response.ok) throw new Error(`Google Sheets respondió ${response.status}.`);
+                if (/^\s*<!doctype html>|<html[\s>]/i.test(rawText)) {
+                    throw new Error('La hoja devolvió HTML (no CSV). Compartí como "Cualquier persona con el enlace: Lector" o "Publicar en la web".');
+                }
+                
+                const rows = parseCsvToRows(rawText);
+                const parsedData = rowsToObjectsCanonical(rows);
+
+                if (parsedData.length === 0) {
+                    resolve({ success: true, importedCount: 0, message: "No se encontraron datos nuevos para importar." });
+                    return;
+                }
+
+                const allProspects = await api.getProspects();
+                const existingPhones = new Set((allProspects || []).map(p => normalizePhone(p.phone || '')).filter(Boolean));
+                const existingEmails = new Set((allProspects || []).map(p => (p.email || '').toLowerCase().trim()).filter(Boolean));
+
+                let total = 0, missing = 0, dup = 0;
+                const newRows: Array<{ name: string; phoneNorm: string; emailNorm: string; row: Record<string,string> }> = [];
+
+                for (const row of parsedData) {
+                    total++;
+                    const name = (row['name'] || '').trim();
+                    const phoneNorm = normalizePhone(row['phone'] || row['whatsapp'] || '');
+                    const emailNorm = (row['email'] || '').toLowerCase().trim();
+
+                    if (!name || (!phoneNorm && !emailNorm)) { missing++; continue; }
+                    const isDup = (phoneNorm && existingPhones.has(phoneNorm)) || (emailNorm && existingEmails.has(emailNorm));
+                    if (isDup) { dup++; continue; }
+
+                    newRows.push({ name, phoneNorm, emailNorm, row });
+                }
+
+                if (newRows.length === 0) {
+                    const message = total > 0 && missing === total
+                        ? 'No se creó ninguno: faltan Nombre y/o Teléfono/Email en todas las filas.'
+                        : 'Todos los prospectos del archivo ya existen en el CRM.';
+                    resolve({ success: true, importedCount: 0, message });
+                    return;
+                }
+
+                const nextActionDate = new Date(); nextActionDate.setDate(nextActionDate.getDate() + 1);
+                const prospectsToAdd = newRows.map((item, index) => {
+                    const assignedTo = allSellers[index % allSellers.length].id;
+                    const phone = item.phoneNorm;
+                    const email = item.emailNorm || placeholderEmailFromPhone(phone);
+                    const r = item.row;
+                    return {
+                        name: item.name, phone, email,
+                        source: ProspectSource.GoogleSheet, interest: ProspectInterest.NotReported, stage: ProspectStage.New,
+                        assignedTo, dni: r['dni'] || '', address: r['sucursal'] || '',
+                        notes: `Importado desde Google Sheet. Origen: ${r['origen'] || 'N/A'} | Sucursal: ${r['sucursal'] || 'N/A'} | Fecha: ${r['fecha'] || 'N/A'}`,
+                        createdBy: currentUser.id, updatedBy: currentUser.id,
+                        nextActionDate: nextActionDate.toISOString(),
+                    };
+                });
+
+                await Promise.all(prospectsToAdd.map(p => api.addProspect(p as any)));
+                
+                const resultMessage = `Filas: ${total} | Creados: ${prospectsToAdd.length} | Duplicados: ${dup} | Sin contacto: ${missing}`;
+                resolve({ success: true, importedCount: prospectsToAdd.length, message: resultMessage });
+
+            } catch (error: any) {
+                console.error("Failed to import from Google Sheet", error);
+                resolve({ success: false, message: error.message || "Ocurrió un error desconocido.", importedCount: 0 });
+            }
+        });
+    },
 };
