@@ -5,7 +5,7 @@ import { AuthContext } from './AuthContext';
 import { User, Branch } from '../types';
 
 // ✅ URL del Apps Script (POST)
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwGH0okDIxOlw6CQBNTI6x3ob1sI8pO7dO7VwX48w18uLpbLmqBqJ_iCpa2rCVehfjglg/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyadfLbpr5wsGpFGpkMMQ8E_5nnzqY7SEiKnibtynSM5vbl-0vC1OwS8Bu05tZtYJG/exec";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

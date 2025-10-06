@@ -31,7 +31,7 @@ import { encrypt, decrypt } from './encryptionService';
 //
 // ---
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVT7XxhIAzCcs474QTQP1W1KTIi1c1Mo9LDVzllTY505DKWBYYT4oAQ3HY3Bc9d_zUxA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyadfLbpr5wsGpFGpkMMQ8E_5nnzqY7SEiKnibtynSM5vbl-0vC1OwS8Bu05tZtYJG/exec";
 
 const MOCK_DELAY = 500; // 500ms delay to simulate network latency
 
