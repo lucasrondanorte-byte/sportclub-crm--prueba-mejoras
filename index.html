@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SportClub CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Shepherd.js for modern tutorials -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@10.0.1/dist/css/shepherd.css"/>
+
+    <!--
+      PRODUCTION NOTE:
+      For optimal performance, Tailwind CSS should be installed via npm and processed
+      as part of the build step (e.g., with Vite and PostCSS). This allows for
+      purging unused styles and minimizing the final CSS bundle size.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!--
+      PRODUCTION NOTE:
+      In a production environment, this configuration should be moved to a
+      `tailwind.config.js` file and processed by your build tool.
+    -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Montserrat', 'sans-serif'],
+            },
+            colors: {
+              'brand-primary': '#E30513',
+              'brand-primary-hover': '#B91C1C',
+              'brand-primary-light': '#FF4D5A',
+              'brand-accent': '#FFD400',
+              'brand-accent-hover': '#E6BB00',
+              'brand-bg': '#121212',
+              'brand-sidebar': '#1A1A1A',
+              'brand-surface': '#1E1E1E',
+              'brand-border': 'rgba(255, 255, 255, 0.1)',
+              'brand-text-primary': '#F5F5F5',
+              'brand-text-secondary': '#A3A3A3',
+              'brand-text-muted': '#737373',
+            },
+            boxShadow: {
+              'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+              'lg': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              'xl': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              'inner-glow': 'inset 0 2px 4px 0 rgba(0,0,0,0.05)',
+              'red-glow': '0 0 20px 0 rgba(227, 5, 19, 0.4)',
+            },
+            keyframes: {
+              pulseGlow: {
+                '0%, 100%': { boxShadow: '0 0 10px rgba(255, 212, 0, 0.3)' },
+                '50%': { boxShadow: '0 0 25px rgba(255, 212, 0, 0.7)' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            },
+            animation: {
+              pulseGlow: 'pulseGlow 3s ease-in-out infinite',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Custom scrollbar for a more integrated look */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1E1E1E;
+      }
+      ::-webkit-scrollbar-thumb {
+        background-color: #444;
+        border-radius: 10px;
+        border: 2px solid #1E1E1E;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #555;
+      }
+      /* Custom background gradient for more depth */
+      body {
+        background-color: #121212;
+        background-image: radial-gradient(circle at top, #1f1f1f 0%, #121212 40%);
+      }
+      /* Custom focus styles for inputs */
+      .form-input {
+        @apply mt-1 block w-full bg-brand-bg border border-brand-border rounded-md shadow-sm p-2 text-brand-text-primary focus:ring-2 focus:ring-brand-primary/80 focus:border-brand-primary;
+      }
+      
+      /* Custom Shepherd.js styles for dark theme */
+      .shepherd-element {
+        background: #1E1E1E;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+        max-width: 400px;
+        font-family: 'Montserrat', sans-serif;
+      }
+      .shepherd-header {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem 1.5rem;
+      }
+      .shepherd-title {
+        color: #F5F5F5;
+        font-weight: 700;
+        font-size: 1.125rem;
+      }
+      .shepherd-cancel-icon {
+        color: #A3A3A3;
+      }
+      .shepherd-cancel-icon:hover {
+        color: #F5F5F5;
+      }
+      .shepherd-text {
+        color: #A3A3A3;
+        padding: 1rem 1.5rem;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+      .shepherd-footer {
+        padding: 0 1.5rem 1rem;
+        border-top: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .shepherd-button {
+        background: #E30513;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.6rem 1.2rem;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+      }
+      .shepherd-button:not(.shepherd-button-secondary):hover {
+        background-color: #B91C1C;
+        box-shadow: 0 0 15px rgba(227, 5, 19, 0.5);
+      }
+      .shepherd-button.shepherd-button-secondary {
+        background: #333;
+        color: #ccc;
+      }
+      .shepherd-button.shepherd-button-secondary:hover {
+        background: #444;
+        color: white;
+      }
+      .shepherd-arrow::before {
+        background: #1E1E1E;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shepherd.js@10.0.1/dist/js/shepherd.min.js"></script>
+
+  <!--
+    PRODUCTION NOTE:
+    This importmap is used for this demo to load dependencies from a CDN without a build step.
+    In a standard Vite production build, dependencies would be bundled from node_modules,
+    and this importmap would not be necessary.
+  -->
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "recharts": "https://aistudiocdn.com/recharts@^3.2.1",
+    "shepherd.js": "https://aistudiocdn.com/shepherd.js@^11.2.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-brand-bg font-sans text-brand-text-primary antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
