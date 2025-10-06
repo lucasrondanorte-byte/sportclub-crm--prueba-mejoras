@@ -1,45 +1,52 @@
-// Dentro de AuthProvider.tsx
+// contexts/AuthProvider.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AuthContext } from './AuthContext';
 import { User, Branch } from '../types';
 
-// 🔗 URL de tu Apps Script (la tuya actual)
+// ✅ URL del Apps Script (POST)
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVT7XxhIAzCcs474QTQP1W1KTIi1c1Mo9LDVzllTY505DKWBYYT4oAQ3HY3Bc9d_zUxA/exec";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('sportclub-crm-user');
+    const storedUser = localStorage.getItem("sportclub-crm-user");
     if (storedUser) {
       try {
         const parsedUser: User = JSON.parse(storedUser);
-        if (parsedUser && parsedUser.email && parsedUser.role) {
+        if (parsedUser && parsedUser.email) {
           setUser(parsedUser);
         }
       } catch (error) {
         console.error("Error al leer usuario del localStorage:", error);
-        localStorage.removeItem('sportclub-crm-user');
+        localStorage.removeItem("sportclub-crm-user");
       }
     }
   }, []);
 
-  // ✅ CORREGIDO: ahora envía 'pin' en lugar de 'password'
+  // ✅ LOGIN via POST
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch(
-        `${SCRIPT_URL}?action=getUser&email=${encodeURIComponent(email)}&pin=${encodeURIComponent(password)}`
-      );
+      const formData = new FormData();
+      formData.append("action", "getUser");
+      formData.append("email", email);
+      formData.append("password", password);
+
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: formData,
+      });
 
       const data = await response.json();
+      console.log("🔍 Respuesta login:", data);
 
       if (data.success && data.user) {
-        localStorage.setItem('sportclub-crm-user', JSON.stringify(data.user));
+        localStorage.setItem("sportclub-crm-user", JSON.stringify(data.user));
         setUser(data.user);
         return true;
       } else {
-        console.warn("Login fallido:", data.message);
+        console.warn("❌ Login fallido:", data.message);
         return false;
       }
     } catch (err) {
@@ -48,11 +55,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // ✅ LOGOUT
   const logout = () => {
-    localStorage.removeItem('sportclub-crm-user');
+    localStorage.removeItem("sportclub-crm-user");
     setUser(null);
   };
 
+  // ✅ REGISTRO via POST
   const signup = async (
     name: string,
     email: string,
@@ -60,10 +69,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     branch: Branch
   ): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await fetch(
-        `${SCRIPT_URL}?action=saveUser&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&pin=${encodeURIComponent(password)}&branch=${encodeURIComponent(branch)}`
-      );
+      const formData = new FormData();
+      formData.append("action", "saveUser");
+      formData.append("name", name);
+      formData.append("email", email);
+      formData.append("pin", password);
+      formData.append("branch", branch);
+
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: formData,
+      });
+
       const data = await response.json();
+      console.log("🆕 Respuesta registro:", data);
       return data;
     } catch (err) {
       console.error("Error en signup:", err);
