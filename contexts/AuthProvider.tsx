@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthContext } from './AuthContext';
 import { User, Branch } from '../types';
 
-// 🔗 URL de tu Apps Script
+// 🔗 URL de tu Apps Script (la tuya actual)
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVT7XxhIAzCcs474QTQP1W1KTIi1c1Mo9LDVzllTY505DKWBYYT4oAQ3HY3Bc9d_zUxA/exec";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -15,7 +15,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedUser) {
       try {
         const parsedUser: User = JSON.parse(storedUser);
-        if (parsedUser && parsedUser.id && parsedUser.role) {
+        if (parsedUser && parsedUser.email && parsedUser.role) {
           setUser(parsedUser);
         }
       } catch (error) {
@@ -25,17 +25,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // ✅ CORREGIDO: ahora envía 'pin' en lugar de 'password'
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const response = await fetch(
-        `${SCRIPT_URL}?action=getUser&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+        `${SCRIPT_URL}?action=getUser&email=${encodeURIComponent(email)}&pin=${encodeURIComponent(password)}`
       );
+
       const data = await response.json();
+
       if (data.success && data.user) {
         localStorage.setItem('sportclub-crm-user', JSON.stringify(data.user));
         setUser(data.user);
         return true;
       } else {
+        console.warn("Login fallido:", data.message);
         return false;
       }
     } catch (err) {
@@ -75,4 +79,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
